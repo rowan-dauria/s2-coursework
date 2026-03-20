@@ -64,6 +64,34 @@ def m0_evidence_numerical(
 # ── M1: single change-point model ────────────────────────────────────────
 
 
+# ── Change-point prior sampling ──────────────────────────────────────────
+
+
+def sample_order_stats(
+    k: int, n_samples: int, L: float = L, even: bool = False,
+    rng: np.random.Generator | None = None,
+) -> np.ndarray:
+    """Sample k change points from an order-statistics prior.
+
+    Parameters
+    ----------
+    even : bool
+        If False, draw k uniform on [0, L] and sort (plain order statistics).
+        If True, draw 2k+1 uniform on [0, L], sort, and take the
+        even-numbered order statistics (1-indexed: 2nd, 4th, ...).
+
+    Returns (n_samples, k).
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    n_draw = 2 * k + 1 if even else k
+    samples = rng.uniform(0, L, size=(n_samples, n_draw))
+    samples.sort(axis=1)
+    if even:
+        samples = samples[:, 1::2]
+    return samples
+
+
 def m1_log_likelihood(
     h0: float, h1: float, s: float, intervals: np.ndarray
 ) -> float:
