@@ -26,39 +26,41 @@ def m0_log_likelihood(h: float | np.ndarray) -> np.ndarray:
     return N * np.log(h) - h * L
 
 
-def m0_posterior_unnorm(h: np.ndarray) -> np.ndarray:
-    """Unnormalised M0 posterior: likelihood × prior."""
-    return np.exp(m0_log_likelihood(h) + gamma_prior_logpdf(h))
-
-
 def m0_posterior_pdf(h: np.ndarray) -> np.ndarray:
     """Normalised M0 posterior — Gamma(alpha + N, beta + L)."""
     return gamma_dist.pdf(h, a=ALPHA + N, scale=1 / (BETA + L))
 
 
-def m0_evidence() -> float:
-    """Analytic evidence Z_0 for M0.
+def m0_posterior_dist():
+    """Return the scipy distribution object for the M0 posterior."""
+    return gamma_dist(a=ALPHA + N, scale=1 / (BETA + L))
 
-    Z_0 = beta^alpha / Gamma(alpha) × Gamma(alpha + N) / (beta + L)^(alpha + N)
+
+def m0_log_evidence() -> float:
+    """Analytic log-evidence log(Z_0) for M0.
+
+    log Z_0 = alpha*log(beta) - gammaln(alpha) + gammaln(alpha+N) - (alpha+N)*log(beta+L)
     """
-    log_z = (
+    return (
         ALPHA * np.log(BETA)
         - special.gammaln(ALPHA)
         + special.gammaln(ALPHA + N)
         - (ALPHA + N) * np.log(BETA + L)
     )
-    return np.exp(log_z)
 
 
-def m0_evidence_numerical(
-    h_upper: float = 0.05, epsrel: float = 1e-12
-) -> tuple[float, float]:
-    """Numerical evidence Z_0 via quadrature.
+def m0_log_evidence_numerical(h_upper: float = 0.05, n_points: int = 10_000) -> float:
+    """Numerical log-evidence log(Z_0) for M0 via the trapezium rule.
 
-    Returns (evidence, absolute_error).
+    Shifts the log-integrand by its peak value before exponentiating to
+    avoid underflow, then adds the shift back.
     """
-    result, err = integrate.quad(m0_posterior_unnorm, 0, h_upper, epsrel=epsrel)
-    return result, err
+    h = np.linspace(0, h_upper, n_points)
+    log_vals = m0_log_likelihood(h[1:]) + gamma_prior_logpdf(h[1:])
+    log_peak = log_vals.max()
+    shifted = np.zeros(n_points)
+    shifted[1:] = np.exp(log_vals - log_peak)
+    return np.log(integrate.trapezoid(shifted, h)) + log_peak
 
 
 # ── M1: single change-point model ────────────────────────────────────────

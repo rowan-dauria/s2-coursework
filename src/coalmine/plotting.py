@@ -7,6 +7,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from coalmine.constants import START_DATE
+from coalmine.analysis import gamma_prior_pdf, m0_posterior_pdf, m0_posterior_dist
 
 # Colourblind-friendly palette (Tol bright)
 CB_COLOURS = ["#4477AA", "#EE6677", "#228833", "#CCBB44", "#66CCEE", "#AA3377", "#BBBBBB"]
@@ -45,6 +46,13 @@ def plot_prior_posterior(
     ax.legend()
     ax.grid(True)
     return ax
+
+
+def plot_m0_prior_posterior(ax: Axes | None = None, n_points: int = 500) -> Axes:
+    """Plot M0 prior and normalised posterior on a sensible h range."""
+    dist = m0_posterior_dist()
+    h = np.linspace(0, dist.mean() + 5 * dist.std(), n_points)
+    return plot_prior_posterior(h, gamma_prior_pdf(h), m0_posterior_pdf(h), ax=ax)
 
 
 def plot_changepoint_prior_comparison(

@@ -12,6 +12,8 @@ dependencies = [
     "pandas",
     "matplotlib",
     "scipy",
+    "pymc",
+    "corner",
 ]
 
 [project.optional-dependencies]
