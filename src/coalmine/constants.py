@@ -9,3 +9,4 @@ ALPHA = 1  # Gamma prior shape parameter
 BETA = 200  # Gamma prior rate parameter (days)
 K_MAX = 30  # maximum number of change points
 LAMBDA_K = 3  # Poisson prior mean for number of change points
+SEED = 42
