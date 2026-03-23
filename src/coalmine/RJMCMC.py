@@ -217,8 +217,41 @@ class RJMCMC:
             This is used to track the acceptance fraction of the chain;
             1 if the move was accepted, 0 otherwise.
         """
-        # TO DO: implement height change move
-        raise NotImplementedError("Height change move not implemented yet.")
+        k = (len(state) - 1) // 2
+        proposed_state = deepcopy(state)
+
+        # choose which height to change
+        # index into the rates part of state
+        j = np.random.randint(0, k+1)
+
+        # isolate the height to be perturbed
+        h_j = state[k+j]
+        # log_ratio = log(h_j_prime/h_j) ~ U(-.5, .5)
+        # from Green 1995
+        log_ratio = np.random.uniform(-.5, .5)
+        # perturb the heigh
+        h_j_prime = h_j * np.exp(log_ratio)
+        # update the proposed state with perturbed height
+        proposed_state[k+j] = h_j_prime
+
+        # compute log likelihood ratio of the perturbed state to the original state
+        log_likelihood_ratio = self.log_likelihood(proposed_state) - \
+                                self.log_likelihood(state)
+
+        # log prior ratio + log Jacobian
+        # prior ratio: (h_j'/h_j)^(alpha-1) * exp(-beta*(h_j'-h_j))
+        # Jacobian of h_j' = h_j*exp(U) w.r.t. U is h_j'/h_j
+        # combined: (h_j'/h_j)^alpha * exp(-beta*(h_j'-h_j))
+        log_accept_prob = log_likelihood_ratio + \
+                            self.alpha * np.log(h_j_prime / h_j) + \
+                            -self.beta * (h_j_prime - h_j)
+
+        # accept or reject with probability exp(log_accept_prob)
+        if np.log(np.random.uniform()) < log_accept_prob:
+            return proposed_state, 1
+        else:
+            return state, 0
+
 
     def position_change_move(self,
                              state,
