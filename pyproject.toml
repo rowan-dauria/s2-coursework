@@ -14,6 +14,7 @@ dependencies = [
     "scipy",
     "pymc",
     "corner",
+    "tqdm",
 ]
 
 [project.optional-dependencies]
