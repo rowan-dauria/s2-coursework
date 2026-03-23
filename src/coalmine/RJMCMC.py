@@ -329,9 +329,44 @@ class RJMCMC:
         log_like_ratio = self.log_likelihood(proposed_state) - \
                             self.log_likelihood(state)
 
+        def _log_prior_ratio_birth():
+            """
+            Calculate the log ratio of the prior probabilities of even orders stats for the birth move.
+
+            Is a sum of:
+            * Log ratio of the *number* of change points
+                * log p(k+1) - log p(k)
+            * Log ratio of the *position* of the change points
+                * log(π(s_1,...,s*,...,s_k | M_{k+1}) / π(s_1,...,s_k | M_k))
+            * Log ratio of the *rate* between the change points
+            """
+            # log ratio of model priors: log p(k+1) - log p(k)
+            log_model_ratio = (np.log(self.prior_k.pmf(k + 1))
+                               - np.log(self.prior_k.pmf(k)))
+
+            # log ratio of change point position priors (even-numbered order
+            # statistics / Dirichlet): accounts for the new gap structure
+
+            log_position_ratio = (np.log(2 * (k + 1) * (2 * k + 3))  # (2k+3)!/(2k+1)! = (2k+3)(2k+2)
+                                  - 2 * np.log(self.duration) # -2log(L)
+                                  + np.log(s_star - s_j)
+                                  + np.log(s_jplus1 - s_star)
+                                  - np.log(s_jplus1 - s_j))
+
+            # log ratio of height priors: one extra Gamma(alpha, beta) factor
+            # for the new rate, plus the change from h_j to (h_j', h_{j+1}')
+            # NB: This can be simplified for alpha=1. Gamma(1) = 1 and alpha-1 = 0
+            log_height_ratio = (self.alpha * np.log(self.beta)
+                                - gammaln(self.alpha)
+                                + (self.alpha - 1) * (np.log(h_j_prime)
+                                                      + np.log(h_jplus1_prime))
+                                - (self.alpha - 1) * np.log(h_j)
+                                - self.beta * (h_j_prime + h_jplus1_prime - h_j))
+
+            return log_model_ratio + log_position_ratio + log_height_ratio
 
         # log prior ratio
-        log_prior_ratio = 0.0
+        log_prior_ratio = _log_prior_ratio_birth()
 
         # log proposal ratio
         bk = self.c * min(1, self.prior_k.pmf(k+1)/self.prior_k.pmf(k))
@@ -402,8 +437,45 @@ class RJMCMC:
                             self.log_likelihood(state)
 
         # log prior ratio
-        # TO DO: implement log prior ratio term for the death move
-        log_prior_ratio = 0.0
+        def _log_prior_ratio_death():
+            """
+            Calculate the log ratio of the prior probabilities of even orders stats for the death move.
+
+            Is a sum of:
+            * Log ratio of the *number* of change points
+                * log p(k-1) - log p(k)
+            * Log ratio of the *position* of the change points
+                * log(π(s_1,...,x,...,s_k | M_{k-1}) / π(s_1,...,s_k | M_k))
+            * Log ratio of the *rate* between the change points
+            """
+            # log ratio of model priors: log p(k-1) - log p(k)
+            log_model_ratio = (np.log(self.prior_k.pmf(k - 1))
+                               - np.log(self.prior_k.pmf(k)))
+
+            # log ratio of change point position priors (even-numbered order
+            # statistics / Dirichlet): accounts for the new gap structure
+
+            log_position_ratio = (2 * np.log(self.duration)
+                                  - np.log(2 * k * (2 * k + 1))
+                                  + np.log(s_jplus1 - s_jminus1)
+                                  - np.log(s_j - s_jminus1)
+                                  - np.log(s_jplus1 - s_j))
+
+            # log ratio of height priors: one extra Gamma(alpha, beta) factor
+            # for the new rate, plus the change from h_j to (h_j', h_{j+1}')
+            # NB: This can be simplified for alpha=1. Gamma(1) = 1 and alpha-1 = 0, but keeping general
+            log_height_ratio = (gammaln(self.alpha)
+                                - self.alpha * np.log(self.beta)
+                                + (self.alpha - 1) * logh_j_prime
+                                - (self.alpha - 1) * (logh_j
+                                                        + logh_jplus1)
+                                + self.beta * (np.exp(logh_j_prime) # h^prime
+                                                - poisson_rates[j-1] # h_j
+                                                - poisson_rates[j])) # h_j+1
+
+            return log_model_ratio + log_position_ratio + log_height_ratio
+
+        log_prior_ratio = _log_prior_ratio_death()
 
         # log proposal ratio
         bkminus1 = self.c * min(1, self.prior_k.pmf(k)/self.prior_k.pmf(k-1))
