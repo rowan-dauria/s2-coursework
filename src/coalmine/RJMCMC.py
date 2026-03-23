@@ -502,7 +502,7 @@ class RJMCMC:
                                 + (self.alpha - 1) * logh_j_prime
                                 - (self.alpha - 1) * (logh_j
                                                         + logh_jplus1)
-                                + self.beta * (np.exp(logh_j_prime) # h^prime
+                                - self.beta * (np.exp(logh_j_prime) # h^prime
                                                 - poisson_rates[j-1] # h_j
                                                 - poisson_rates[j])) # h_j+1
 
