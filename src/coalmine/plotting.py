@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from coalmine.constants import START_DATE
+from coalmine.constants import START_DATE, L
 from coalmine.analysis import gamma_prior_pdf, m0_posterior_pdf, m0_posterior_dist
 
 # Colourblind-friendly palette (Tol bright)
@@ -15,6 +15,7 @@ CB_COLOURS = ["#4477AA", "#EE6677", "#228833", "#CCBB44", "#66CCEE", "#AA3377", 
 
 def plot_cumulative_accidents(
     dates: pd.DatetimeIndex,
+    mean_rate: float | None = None,
     ax: Axes | None = None,
     **kwargs,
 ) -> Axes:
@@ -23,9 +24,15 @@ def plot_cumulative_accidents(
         _, ax = plt.subplots(figsize=(10, 5))
     counts = np.arange(1, len(dates) + 1)
     ax.step(dates, counts, where="post", **kwargs)
+    if mean_rate is not None:
+        t_days = np.array([0, L])
+        mean_dates = START_DATE + pd.to_timedelta(t_days, unit="D")
+        ax.plot(mean_dates, mean_rate * t_days, linestyle="--", color=CB_COLOURS[1],
+                label=f"Mean rate ({mean_rate:.5f} acc/day)")
     ax.set_xlabel("Date")
     ax.set_ylabel("Cumulative number of accidents")
     ax.set_title("Cumulative Coal Mining Accidents (1851–1962)")
+    ax.legend()
     ax.grid(True)
     return ax
 
