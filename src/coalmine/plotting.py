@@ -1,5 +1,8 @@
 """Visualisation helpers for coal mining accident analysis."""
 
+from functools import wraps
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -12,7 +15,43 @@ from coalmine.analysis import gamma_prior_pdf, m0_posterior_pdf, m0_posterior_di
 # Colourblind-friendly palette (Tol bright)
 CB_COLOURS = ["#4477AA", "#EE6677", "#228833", "#CCBB44", "#66CCEE", "#AA3377", "#BBBBBB"]
 
+FIGS_DIR = Path(__file__).resolve().parents[2] / "figs"
 
+
+def savefig(fig: Figure, name: str, **kwargs) -> Path:
+    """Save *fig* to the figs/ directory as a PDF and PNG.
+
+    Returns the stem path (without extension) for reference.
+    """
+    FIGS_DIR.mkdir(exist_ok=True)
+    defaults = dict(dpi=300, bbox_inches="tight")
+    defaults.update(kwargs)
+    for ext in ("pdf", "png"):
+        fig.savefig(FIGS_DIR / f"{name}.{ext}", **defaults)
+    return FIGS_DIR / name
+
+
+def autosave(fn):
+    """Decorator that adds a ``save_as`` kwarg to a plotting function.
+
+    If ``save_as`` is passed, the returned Figure (or the Figure owning the
+    returned Axes) is saved to ``figs/<save_as>.{pdf,png}`` automatically.
+
+    Usage in a notebook::
+
+        plot_cumulative_accidents(dates, save_as="q1_cumulative")
+    """
+    @wraps(fn)
+    def wrapper(*args, save_as=None, **kwargs):
+        result = fn(*args, **kwargs)
+        if save_as is not None:
+            fig = result if isinstance(result, Figure) else result.get_figure()
+            savefig(fig, save_as)
+        return result
+    return wrapper
+
+
+@autosave
 def plot_cumulative_accidents(
     dates: pd.DatetimeIndex,
     mean_rate: float | None = None,
@@ -37,6 +76,7 @@ def plot_cumulative_accidents(
     return ax
 
 
+@autosave
 def plot_prior_posterior(
     h: np.ndarray,
     prior: np.ndarray,
@@ -55,6 +95,7 @@ def plot_prior_posterior(
     return ax
 
 
+@autosave
 def plot_m0_prior_posterior(ax: Axes | None = None, n_points: int = 500) -> Axes:
     """Plot M0 prior and normalised posterior on a sensible h range."""
     dist = m0_posterior_dist()
@@ -62,6 +103,7 @@ def plot_m0_prior_posterior(ax: Axes | None = None, n_points: int = 500) -> Axes
     return plot_prior_posterior(h, gamma_prior_pdf(h), m0_posterior_pdf(h), ax=ax)
 
 
+@autosave
 def plot_changepoint_prior_comparison(
     plain_samples: np.ndarray,
     even_samples: np.ndarray,
@@ -120,6 +162,7 @@ def plot_changepoint_prior_comparison(
     return fig
 
 
+@autosave
 def plot_rate_history(
     intervals: np.ndarray,
     rates: np.ndarray,
