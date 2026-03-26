@@ -1,18 +1,26 @@
 """Statistical analysis: priors, posteriors, evidence, and likelihoods."""
 
 import numpy as np
-from scipy import special, integrate
+from scipy import integrate, special
 from scipy.stats import gamma as gamma_dist
 
 from coalmine.constants import ALPHA, BETA, L, N
 
 
-def gamma_prior_pdf(h: np.ndarray, alpha: float = ALPHA, beta: float = BETA) -> np.ndarray:
+def gamma_prior_pdf(
+    h: np.ndarray,
+    alpha: float = ALPHA,
+    beta: float = BETA,
+) -> np.ndarray:
     """Gamma(alpha, beta) prior PDF for rate heights h."""
     return gamma_dist.pdf(h, a=alpha, scale=1 / beta)
 
 
-def gamma_prior_logpdf(h: np.ndarray, alpha: float = ALPHA, beta: float = BETA) -> np.ndarray:
+def gamma_prior_logpdf(
+    h: np.ndarray,
+    alpha: float = ALPHA,
+    beta: float = BETA,
+) -> np.ndarray:
     """Log of Gamma(alpha, beta) prior PDF for rate heights h."""
     return gamma_dist.logpdf(h, a=alpha, scale=1 / beta)
 
@@ -39,7 +47,8 @@ def m0_posterior_dist():
 def m0_log_evidence() -> float:
     """Analytic log-evidence log(Z_0) for M0.
 
-    log Z_0 = alpha*log(beta) - gammaln(alpha) + gammaln(alpha+N) - (alpha+N)*log(beta+L)
+    log Z_0 = alpha*log(beta) - gammaln(alpha)
+            + gammaln(alpha+N) - (alpha+N)*log(beta+L)
     """
     return (
         ALPHA * np.log(BETA)
@@ -70,7 +79,10 @@ def m0_log_evidence_numerical(h_upper: float = 0.05, n_points: int = 10_000) -> 
 
 
 def sample_order_stats(
-    k: int, n_samples: int, L: float = L, even: bool = False,
+    k: int,
+    n_samples: int,
+    L: float = L,
+    even: bool = False,
     rng: np.random.Generator | None = None,
 ) -> np.ndarray:
     """Sample k change points from an order-statistics prior.
@@ -94,9 +106,7 @@ def sample_order_stats(
     return samples
 
 
-def m1_log_likelihood(
-    h0: float, h1: float, s: float, intervals: np.ndarray
-) -> float:
+def m1_log_likelihood(h0: float, h1: float, s: float, intervals: np.ndarray) -> float:
     """Log-likelihood for M1 with rates h0, h1 and change point at time s.
 
     Parameters

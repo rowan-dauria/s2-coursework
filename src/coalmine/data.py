@@ -5,10 +5,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from coalmine.constants import L, N, START_DATE
+from coalmine.constants import START_DATE, L, N
 
 
-def load_intervals(path: str | Path = "data/coal_mining_accident_data.dat") -> np.ndarray:
+def load_intervals(
+    path: str | Path = "data/coal_mining_accident_data.dat",
+) -> np.ndarray:
     """Load inter-accident intervals in chronological order.
 
     The raw file is a 17×10 matrix read column-wise (Fortran order).
@@ -20,7 +22,9 @@ def load_intervals(path: str | Path = "data/coal_mining_accident_data.dat") -> n
     """
     data_matrix = np.loadtxt(path)
     intervals = data_matrix.flatten(order="F")
-    assert intervals.shape == (N - 1,), f"Expected {N - 1} intervals, got {intervals.shape[0]}"
+    assert intervals.shape == (N - 1,), (
+        f"Expected {N - 1} intervals, got {intervals.shape[0]}"
+    )
     return intervals
 
 

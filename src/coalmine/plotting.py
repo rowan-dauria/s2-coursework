@@ -3,17 +3,25 @@
 from functools import wraps
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
+from coalmine.analysis import gamma_prior_pdf, m0_posterior_dist, m0_posterior_pdf
 from coalmine.constants import START_DATE, L
-from coalmine.analysis import gamma_prior_pdf, m0_posterior_pdf, m0_posterior_dist
 
 # Colourblind-friendly palette (Tol bright)
-CB_COLOURS = ["#4477AA", "#EE6677", "#228833", "#CCBB44", "#66CCEE", "#AA3377", "#BBBBBB"]
+CB_COLOURS = [
+    "#4477AA",
+    "#EE6677",
+    "#228833",
+    "#CCBB44",
+    "#66CCEE",
+    "#AA3377",
+    "#BBBBBB",
+]
 
 FIGS_DIR = Path(__file__).resolve().parents[2] / "figs"
 
@@ -41,6 +49,7 @@ def autosave(fn):
 
         plot_cumulative_accidents(dates, save_as="q1_cumulative")
     """
+
     @wraps(fn)
     def wrapper(*args, save_as=None, **kwargs):
         result = fn(*args, **kwargs)
@@ -48,6 +57,7 @@ def autosave(fn):
             fig = result if isinstance(result, Figure) else result.get_figure()
             savefig(fig, save_as)
         return result
+
     return wrapper
 
 
@@ -66,8 +76,13 @@ def plot_cumulative_accidents(
     if mean_rate is not None:
         t_days = np.array([0, L])
         mean_dates = START_DATE + pd.to_timedelta(t_days, unit="D")
-        ax.plot(mean_dates, mean_rate * t_days, linestyle="--", color=CB_COLOURS[1],
-                label=f"Mean rate ({mean_rate:.5f} acc/day)")
+        ax.plot(
+            mean_dates,
+            mean_rate * t_days,
+            linestyle="--",
+            color=CB_COLOURS[1],
+            label=f"Mean rate ({mean_rate:.5f} acc/day)",
+        )
     ax.set_xlabel("Date")
     ax.set_ylabel("Cumulative number of accidents")
     ax.set_title("Cumulative Coal Mining Accidents (1851–1962)")
@@ -125,13 +140,22 @@ def plot_changepoint_prior_comparison(
     for j in range(k):
         c = CB_COLOURS[j % len(CB_COLOURS)]
         ax.hist(
-            plain_samples[:, j], bins=80, density=True, alpha=0.35,
-            color=c, label=f"Plain $s_{j+1}$",
+            plain_samples[:, j],
+            bins=80,
+            density=True,
+            alpha=0.35,
+            color=c,
+            label=f"Plain $s_{j + 1}$",
         )
         ax.hist(
-            even_samples[:, j], bins=80, density=True, alpha=0.35,
-            color=c, histtype="step", linewidth=1.5,
-            label=f"Even $s_{j+1}$",
+            even_samples[:, j],
+            bins=80,
+            density=True,
+            alpha=0.35,
+            color=c,
+            histtype="step",
+            linewidth=1.5,
+            label=f"Even $s_{j + 1}$",
         )
     ax.set_xlabel("Position (days)")
     ax.set_ylabel("Density")
@@ -142,17 +166,37 @@ def plot_changepoint_prior_comparison(
     # Panel 2: minimum gap distribution
     ax = axes[1]
     plain_gaps = np.diff(
-        np.column_stack([np.zeros(len(plain_samples)), plain_samples,
-                         np.full(len(plain_samples), L)]),
+        np.column_stack(
+            [
+                np.zeros(len(plain_samples)),
+                plain_samples,
+                np.full(len(plain_samples), L),
+            ]
+        ),
         axis=1,
     )
     even_gaps = np.diff(
-        np.column_stack([np.zeros(len(even_samples)), even_samples,
-                         np.full(len(even_samples), L)]),
+        np.column_stack(
+            [np.zeros(len(even_samples)), even_samples, np.full(len(even_samples), L)]
+        ),
         axis=1,
     )
-    ax.hist(plain_gaps.min(axis=1), bins=80, density=True, alpha=0.5, label="Plain", color=CB_COLOURS[0])
-    ax.hist(even_gaps.min(axis=1), bins=80, density=True, alpha=0.5, label="Even", color=CB_COLOURS[1])
+    ax.hist(
+        plain_gaps.min(axis=1),
+        bins=80,
+        density=True,
+        alpha=0.5,
+        label="Plain",
+        color=CB_COLOURS[0],
+    )
+    ax.hist(
+        even_gaps.min(axis=1),
+        bins=80,
+        density=True,
+        alpha=0.5,
+        label="Even",
+        color=CB_COLOURS[1],
+    )
     ax.set_xlabel("Minimum gap (days)")
     ax.set_ylabel("Density")
     ax.set_title(f"Distribution of minimum gap ($k={k}$)")
@@ -230,7 +274,12 @@ def plot_rate_history(
     ax.step(dates, rates, where="post", label="Rate estimate", color=CB_COLOURS[0])
     if lower is not None and upper is not None:
         ax.fill_between(
-            dates, lower, upper, step="post", alpha=0.3, label="Credible interval",
+            dates,
+            lower,
+            upper,
+            step="post",
+            alpha=0.3,
+            label="Credible interval",
             color=CB_COLOURS[0],
         )
     ax.set_xlabel("Date")

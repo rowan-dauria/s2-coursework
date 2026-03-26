@@ -1,8 +1,9 @@
-import numpy as np
-from scipy.stats import gamma, poisson
-from scipy.special import gammaln, logsumexp
-from tqdm import tqdm
 from copy import deepcopy
+
+import numpy as np
+from scipy.special import gammaln, logsumexp
+from scipy.stats import gamma, poisson
+from tqdm import tqdm
 
 
 class RJMCMC:
@@ -37,12 +38,7 @@ class RJMCMC:
         x = (s_1, s_2, \ldots, s_k, h_0, h_1, \ldots, h_k).
     """
 
-    def __init__(self,
-                 intervals,
-                 lam=3.0,
-                 k_max=30,
-                 alpha=1.0,
-                 beta=200.0):
+    def __init__(self, intervals, lam=3.0, k_max=30, alpha=1.0, beta=200.0):
         r"""
         Parameters
         ----------
@@ -63,11 +59,10 @@ class RJMCMC:
         """
         self.intervals = np.array(intervals, dtype=int)
 
-        assert np.all(self.intervals >= 0), \
-            "All time intervals must be non negative."
+        assert np.all(self.intervals >= 0), "All time intervals must be non negative."
 
         # Number of accidents, N
-        N_minus_1, = self.intervals.shape
+        (N_minus_1,) = self.intervals.shape
         self.num_accidents = 1 + N_minus_1
 
         # Accident times, y_i
@@ -86,8 +81,7 @@ class RJMCMC:
         self.prior_k = poisson(self.lam)
 
         # Prior on the Poisson rates h_j
-        self.rate_prior = gamma(a=self.alpha,
-                                scale=1.0/self.beta)
+        self.rate_prior = gamma(a=self.alpha, scale=1.0 / self.beta)
 
         # Compute constant c for RJMCMC proposal
         self.compute_c()
@@ -98,16 +92,25 @@ class RJMCMC:
         """
         k_vals = np.arange(0, self.k_max + 1)
 
-        b_k = np.array([ min(1, self.prior_k.pmf(k+1)/self.prior_k.pmf(k))
-                        if k<self.k_max else 0.0 for k in k_vals ])
+        b_k = np.array(
+            [
+                min(1, self.prior_k.pmf(k + 1) / self.prior_k.pmf(k))
+                if k < self.k_max
+                else 0.0
+                for k in k_vals
+            ]
+        )
 
-        d_k = np.array([ min(1, self.prior_k.pmf(k-1)/self.prior_k.pmf(k))
-                        if k>0 else 0.0 for k in k_vals ])
+        d_k = np.array(
+            [
+                min(1, self.prior_k.pmf(k - 1) / self.prior_k.pmf(k)) if k > 0 else 0.0
+                for k in k_vals
+            ]
+        )
 
-        self.c = 0.9/np.max(b_k + d_k)
+        self.c = 0.9 / np.max(b_k + d_k)
 
-    def log_likelihood(self,
-                       x):
+    def log_likelihood(self, x):
         r"""
         Computes the log-likelihood of the data given the model parameters `x`
         for the inhomogenous Poisson process with :math:`k` change points.
@@ -128,20 +131,19 @@ class RJMCMC:
         """
         x = np.asarray(x)
 
-        k = (len(x)-1) // 2
+        k = (len(x) - 1) // 2
 
-        change_points = x[0:k]      # s_1, s_2, ..., s_k
-        poisson_rates = x[k:2*k+1]  # h_0, h_1, h_2, ..., h_k
+        change_points = x[0:k]  # s_1, s_2, ..., s_k
+        poisson_rates = x[k : 2 * k + 1]  # h_0, h_1, h_2, ..., h_k
 
         idx = np.searchsorted(change_points, self.accident_times, side="right")
-        gaps = np.diff(np.hstack([0., change_points, self.duration]))
+        gaps = np.diff(np.hstack([0.0, change_points, self.duration]))
 
-        logL = np.sum(np.log(poisson_rates[idx])) - np.sum(poisson_rates*gaps)
+        logL = np.sum(np.log(poisson_rates[idx])) - np.sum(poisson_rates * gaps)
 
         return logL
 
-    def transition(self,
-                   state):
+    def transition(self, state):
         r"""
         Metropolis-Hastings transition to the next state in the Markov chain.
 
@@ -163,20 +165,27 @@ class RJMCMC:
         """
         k = (len(state) - 1) // 2
 
-        b_k = self.c * min(1, self.prior_k.pmf(k+1)/self.prior_k.pmf(k)) \
-                if k<self.k_max else 0.0
-        d_k = self.c * min(1, self.prior_k.pmf(k-1)/self.prior_k.pmf(k)) \
-                if k>0 else 0.0
+        b_k = (
+            self.c * min(1, self.prior_k.pmf(k + 1) / self.prior_k.pmf(k))
+            if k < self.k_max
+            else 0.0
+        )
+        d_k = (
+            self.c * min(1, self.prior_k.pmf(k - 1) / self.prior_k.pmf(k))
+            if k > 0
+            else 0.0
+        )
 
-        if k==0:
+        if k == 0:
             eta_k = 1.0 - b_k - d_k
             pi_k = 0.0
         else:
             eta_k = 0.5 * (1.0 - b_k - d_k)
             pi_k = 0.5 * (1.0 - b_k - d_k)
 
-        assert np.isclose(eta_k + pi_k + b_k + d_k, 1.0), \
+        assert np.isclose(eta_k + pi_k + b_k + d_k, 1.0), (
             "Move probabilities do not sum to 1."
+        )
 
         # POSSIBLE MOVE TYPES:
         # 0 : H = height change move, with probability eta_k
@@ -198,8 +207,7 @@ class RJMCMC:
 
         return next_state, move_type, accept
 
-    def height_change_move(self,
-                           state):
+    def height_change_move(self, state):
         r"""
         Height change move: propose to change one of the Poisson rates. The move
         is either accepted or rejected using the Metropolis-Hastings criterion.
@@ -222,29 +230,32 @@ class RJMCMC:
 
         # choose which height to change
         # index into the rates part of state
-        j = np.random.randint(0, k+1)
+        j = np.random.randint(0, k + 1)
 
         # isolate the height to be perturbed
-        h_j = state[k+j]
+        h_j = state[k + j]
         # log_ratio = log(h_j_prime/h_j) ~ U(-.5, .5)
         # from Green 1995
-        log_ratio = np.random.uniform(-.5, .5)
+        log_ratio = np.random.uniform(-0.5, 0.5)
         # perturb the heigh
         h_j_prime = h_j * np.exp(log_ratio)
         # update the proposed state with perturbed height
-        proposed_state[k+j] = h_j_prime
+        proposed_state[k + j] = h_j_prime
 
         # compute log likelihood ratio of the perturbed state to the original state
-        log_likelihood_ratio = self.log_likelihood(proposed_state) - \
-                                self.log_likelihood(state)
+        log_likelihood_ratio = self.log_likelihood(
+            proposed_state
+        ) - self.log_likelihood(state)
 
         # log prior ratio + log Jacobian
         # prior ratio: (h_j'/h_j)^(alpha-1) * exp(-beta*(h_j'-h_j))
         # Jacobian of h_j' = h_j*exp(U) w.r.t. U is h_j'/h_j
         # combined: (h_j'/h_j)^alpha * exp(-beta*(h_j'-h_j))
-        log_accept_prob = log_likelihood_ratio + \
-                            self.alpha * np.log(h_j_prime / h_j) + \
-                            -self.beta * (h_j_prime - h_j)
+        log_accept_prob = (
+            log_likelihood_ratio
+            + self.alpha * np.log(h_j_prime / h_j)
+            + -self.beta * (h_j_prime - h_j)
+        )
 
         # accept or reject with probability exp(log_accept_prob)
         if np.log(np.random.uniform()) < log_accept_prob:
@@ -252,10 +263,7 @@ class RJMCMC:
         else:
             return state, 0
 
-
-    def position_change_move(self,
-                             state,
-                             eps=1.0e-10):
+    def position_change_move(self, state, eps=1.0e-10):
         r"""
         Position change move: propose to change the position of an existing
         change point. The move is either accepted or rejected using the
@@ -281,25 +289,28 @@ class RJMCMC:
         proposed_state = deepcopy(state)
 
         # choose which position to use
-        j = np.random.randint(1, k+1)
+        j = np.random.randint(1, k + 1)
 
         # propose new position
-        s_jminus1 = state[j-2] if j>1 else 0.0
-        s_j = state[j-1]
-        s_jplus1 = state[j] if j<k else self.duration
-        s_j_prime = np.random.uniform(low=s_jminus1+eps, high=s_jplus1-eps)
-        proposed_state[j-1] = s_j_prime
+        s_jminus1 = state[j - 2] if j > 1 else 0.0
+        s_j = state[j - 1]
+        s_jplus1 = state[j] if j < k else self.duration
+        s_j_prime = np.random.uniform(low=s_jminus1 + eps, high=s_jplus1 - eps)
+        proposed_state[j - 1] = s_j_prime
 
         # log likelihood ratio
-        log_like_ratio = self.log_likelihood(proposed_state) - \
-                            self.log_likelihood(state)
+        log_like_ratio = self.log_likelihood(proposed_state) - self.log_likelihood(
+            state
+        )
 
         # log acceptance probability
-        log_accept_prob = log_like_ratio + \
-                            np.log(s_jplus1-s_j_prime) + \
-                            np.log(s_j_prime - s_jminus1) - \
-                            np.log(s_jplus1 - s_j) - \
-                            np.log(s_j - s_jminus1)
+        log_accept_prob = (
+            log_like_ratio
+            + np.log(s_jplus1 - s_j_prime)
+            + np.log(s_j_prime - s_jminus1)
+            - np.log(s_jplus1 - s_j)
+            - np.log(s_j - s_jminus1)
+        )
 
         # either accept or reject the proposed move
         if np.log(np.random.uniform()) < log_accept_prob:
@@ -309,9 +320,7 @@ class RJMCMC:
             accept = 0
             return state, accept
 
-    def birth_move(self,
-                   state,
-                   eps=1.0e-10):
+    def birth_move(self, state, eps=1.0e-10):
         r"""
         Birth move: propose to add a new change point. This increases the
         model dimension. The move is either accepted or rejected using the
@@ -335,36 +344,38 @@ class RJMCMC:
         k = (len(state) - 1) // 2
 
         change_points = np.hstack((state[0:k], np.array([self.duration])))
-        poisson_rates = state[k:2*k+1]
+        poisson_rates = state[k : 2 * k + 1]
 
         # choose new position
         s_star = np.random.uniform(low=0.0, high=self.duration)
-        idx = np.argmax(s_star<change_points)
-        s_j = change_points[idx-1] if idx>0 else 0.0
+        idx = np.argmax(s_star < change_points)
+        s_j = change_points[idx - 1] if idx > 0 else 0.0
         s_jplus1 = change_points[idx]
         proposed_change_points = np.sort(np.hstack((state[0:k], s_star)))
 
         # choose new rate
-        u = np.random.uniform(low=eps, high=1.0-eps)
+        u = np.random.uniform(low=eps, high=1.0 - eps)
         h_j = poisson_rates[idx]
         proposed_poisson_rates = deepcopy(poisson_rates)
-        h_j_prime = h_j * ((1-u)/u)**(-(s_jplus1-s_star)/(s_jplus1 - s_j))
-        h_jplus1_prime = h_j_prime * ((1-u)/u)
+        h_j_prime = h_j * ((1 - u) / u) ** (-(s_jplus1 - s_star) / (s_jplus1 - s_j))
+        h_jplus1_prime = h_j_prime * ((1 - u) / u)
         proposed_poisson_rates[idx] = h_j_prime
-        proposed_poisson_rates = np.insert(proposed_poisson_rates,
-                                           idx+1, h_jplus1_prime)
+        proposed_poisson_rates = np.insert(
+            proposed_poisson_rates, idx + 1, h_jplus1_prime
+        )
 
         # proposed state
-        proposed_state = np.hstack([proposed_change_points,
-                                    proposed_poisson_rates])
+        proposed_state = np.hstack([proposed_change_points, proposed_poisson_rates])
 
         # log likelihood ratio
-        log_like_ratio = self.log_likelihood(proposed_state) - \
-                            self.log_likelihood(state)
+        log_like_ratio = self.log_likelihood(proposed_state) - self.log_likelihood(
+            state
+        )
 
         def _log_prior_ratio_birth():
             """
-            Calculate the log ratio of the prior probabilities of even orders stats for the birth move.
+            Calculate the log ratio of the prior probabilities
+            of even orders stats for the birth move.
 
             Is a sum of:
             * Log ratio of the *number* of change points
@@ -374,27 +385,32 @@ class RJMCMC:
             * Log ratio of the *rate* between the change points
             """
             # log ratio of model priors: log p(k+1) - log p(k)
-            log_model_ratio = (np.log(self.prior_k.pmf(k + 1))
-                               - np.log(self.prior_k.pmf(k)))
+            log_model_ratio = np.log(self.prior_k.pmf(k + 1)) - np.log(
+                self.prior_k.pmf(k)
+            )
 
             # log ratio of change point position priors (even-numbered order
             # statistics / Dirichlet): accounts for the new gap structure
 
-            log_position_ratio = (np.log(2 * (k + 1) * (2 * k + 3))  # (2k+3)!/(2k+1)! = (2k+3)(2k+2)
-                                  - 2 * np.log(self.duration) # -2log(L)
-                                  + np.log(s_star - s_j)
-                                  + np.log(s_jplus1 - s_star)
-                                  - np.log(s_jplus1 - s_j))
+            # (2k+3)!/(2k+1)! = (2k+3)(2k+2)
+            log_position_ratio = (
+                np.log(2 * (k + 1) * (2 * k + 3))
+                - 2 * np.log(self.duration)  # -2log(L)
+                + np.log(s_star - s_j)
+                + np.log(s_jplus1 - s_star)
+                - np.log(s_jplus1 - s_j)
+            )
 
             # log ratio of height priors: one extra Gamma(alpha, beta) factor
             # for the new rate, plus the change from h_j to (h_j', h_{j+1}')
             # NB: This can be simplified for alpha=1. Gamma(1) = 1 and alpha-1 = 0
-            log_height_ratio = (self.alpha * np.log(self.beta)
-                                - gammaln(self.alpha)
-                                + (self.alpha - 1) * (np.log(h_j_prime)
-                                                      + np.log(h_jplus1_prime))
-                                - (self.alpha - 1) * np.log(h_j)
-                                - self.beta * (h_j_prime + h_jplus1_prime - h_j))
+            log_height_ratio = (
+                self.alpha * np.log(self.beta)
+                - gammaln(self.alpha)
+                + (self.alpha - 1) * (np.log(h_j_prime) + np.log(h_jplus1_prime))
+                - (self.alpha - 1) * np.log(h_j)
+                - self.beta * (h_j_prime + h_jplus1_prime - h_j)
+            )
 
             return log_model_ratio + log_position_ratio + log_height_ratio
 
@@ -402,16 +418,17 @@ class RJMCMC:
         log_prior_ratio = _log_prior_ratio_birth()
 
         # log proposal ratio
-        bk = self.c * min(1, self.prior_k.pmf(k+1)/self.prior_k.pmf(k))
-        dkplus1 = self.c * min(1, self.prior_k.pmf(k)/self.prior_k.pmf(k+1))
-        log_proposal_ratio = np.log(dkplus1*self.duration) - np.log(bk*(k+1))
+        bk = self.c * min(1, self.prior_k.pmf(k + 1) / self.prior_k.pmf(k))
+        dkplus1 = self.c * min(1, self.prior_k.pmf(k) / self.prior_k.pmf(k + 1))
+        log_proposal_ratio = np.log(dkplus1 * self.duration) - np.log(bk * (k + 1))
 
         # log Jacobian
         log_jacobian = 2.0 * np.log(h_jplus1_prime + h_j_prime) - np.log(h_j)
 
         # log acceptance probability
-        log_accept_prob = log_like_ratio + log_prior_ratio + \
-                                log_proposal_ratio + log_jacobian
+        log_accept_prob = (
+            log_like_ratio + log_prior_ratio + log_proposal_ratio + log_jacobian
+        )
 
         # either accept or reject the proposed move
         if np.log(np.random.uniform()) < log_accept_prob:
@@ -421,8 +438,7 @@ class RJMCMC:
             accept = 0
             return state, accept
 
-    def death_move(self,
-                   state):
+    def death_move(self, state):
         r"""
         Death move: propose to remove an existing change point. This decreases
         the model dimension. The move is either accepted or rejected using the
@@ -444,35 +460,37 @@ class RJMCMC:
         k = (len(state) - 1) // 2
 
         change_points = state[0:k]
-        poisson_rates = state[k:2*k+1]
+        poisson_rates = state[k : 2 * k + 1]
 
         # choose which change point to remove
-        j = np.random.randint(1, k+1)
-        s_jminus1 = change_points[j-2] if j>1 else 0.0
-        s_j = change_points[j-1]
-        s_jplus1 = change_points[j] if j<k else self.duration
-        proposed_change_points = np.delete(change_points, j-1)
+        j = np.random.randint(1, k + 1)
+        s_jminus1 = change_points[j - 2] if j > 1 else 0.0
+        s_j = change_points[j - 1]
+        s_jplus1 = change_points[j] if j < k else self.duration
+        proposed_change_points = np.delete(change_points, j - 1)
 
         # propose new rate
-        logh_j = np.log(poisson_rates[j-1])
+        logh_j = np.log(poisson_rates[j - 1])
         logh_jplus1 = np.log(poisson_rates[j])
-        logh_j_prime = ( (s_j-s_jminus1)*logh_j + (s_jplus1-s_j)*logh_jplus1 ) / \
-                    (s_jplus1 - s_jminus1)
+        logh_j_prime = ((s_j - s_jminus1) * logh_j + (s_jplus1 - s_j) * logh_jplus1) / (
+            s_jplus1 - s_jminus1
+        )
         proposed_poisson_rates = np.delete(poisson_rates, j)
-        proposed_poisson_rates[j-1] = np.exp(logh_j_prime)
+        proposed_poisson_rates[j - 1] = np.exp(logh_j_prime)
 
         # proposed state
-        proposed_state = np.hstack([proposed_change_points,
-                                    proposed_poisson_rates])
+        proposed_state = np.hstack([proposed_change_points, proposed_poisson_rates])
 
         # log likelihood ratio
-        log_like_ratio = self.log_likelihood(proposed_state) - \
-                            self.log_likelihood(state)
+        log_like_ratio = self.log_likelihood(proposed_state) - self.log_likelihood(
+            state
+        )
 
         # log prior ratio
         def _log_prior_ratio_death():
             """
-            Calculate the log ratio of the prior probabilities of even orders stats for the death move.
+            Calculate the log ratio of the prior probabilities
+            of even orders stats for the death move.
 
             Is a sum of:
             * Log ratio of the *number* of change points
@@ -482,45 +500,54 @@ class RJMCMC:
             * Log ratio of the *rate* between the change points
             """
             # log ratio of model priors: log p(k-1) - log p(k)
-            log_model_ratio = (np.log(self.prior_k.pmf(k - 1))
-                               - np.log(self.prior_k.pmf(k)))
+            log_model_ratio = np.log(self.prior_k.pmf(k - 1)) - np.log(
+                self.prior_k.pmf(k)
+            )
 
             # log ratio of change point position priors (even-numbered order
             # statistics / Dirichlet): accounts for the new gap structure
 
-            log_position_ratio = (2 * np.log(self.duration)
-                                  - np.log(2 * k * (2 * k + 1))
-                                  + np.log(s_jplus1 - s_jminus1)
-                                  - np.log(s_j - s_jminus1)
-                                  - np.log(s_jplus1 - s_j))
+            log_position_ratio = (
+                2 * np.log(self.duration)
+                - np.log(2 * k * (2 * k + 1))
+                + np.log(s_jplus1 - s_jminus1)
+                - np.log(s_j - s_jminus1)
+                - np.log(s_jplus1 - s_j)
+            )
 
             # log ratio of height priors: one extra Gamma(alpha, beta) factor
             # for the new rate, plus the change from h_j to (h_j', h_{j+1}')
-            # NB: This can be simplified for alpha=1. Gamma(1) = 1 and alpha-1 = 0, but keeping general
-            log_height_ratio = (gammaln(self.alpha)
-                                - self.alpha * np.log(self.beta)
-                                + (self.alpha - 1) * logh_j_prime
-                                - (self.alpha - 1) * (logh_j
-                                                        + logh_jplus1)
-                                - self.beta * (np.exp(logh_j_prime) # h^prime
-                                                - poisson_rates[j-1] # h_j
-                                                - poisson_rates[j])) # h_j+1
+            # NB: Simplifies for alpha=1 (Gamma(1)=1, alpha-1=0),
+            # but keeping general
+            log_height_ratio = (
+                gammaln(self.alpha)
+                - self.alpha * np.log(self.beta)
+                + (self.alpha - 1) * logh_j_prime
+                - (self.alpha - 1) * (logh_j + logh_jplus1)
+                - self.beta
+                * (
+                    np.exp(logh_j_prime)  # h^prime
+                    - poisson_rates[j - 1]  # h_j
+                    - poisson_rates[j]
+                )
+            )  # h_j+1
 
             return log_model_ratio + log_position_ratio + log_height_ratio
 
         log_prior_ratio = _log_prior_ratio_death()
 
         # log proposal ratio
-        bkminus1 = self.c * min(1, self.prior_k.pmf(k)/self.prior_k.pmf(k-1))
-        dk = self.c * min(1, self.prior_k.pmf(k-1)/self.prior_k.pmf(k))
-        log_proposal_ratio = np.log(bkminus1*k) - np.log(dk*self.duration)
+        bkminus1 = self.c * min(1, self.prior_k.pmf(k) / self.prior_k.pmf(k - 1))
+        dk = self.c * min(1, self.prior_k.pmf(k - 1) / self.prior_k.pmf(k))
+        log_proposal_ratio = np.log(bkminus1 * k) - np.log(dk * self.duration)
 
         # log Jacobian
-        log_jacobian = logh_j_prime - 2.0 * logsumexp([logh_j,logh_jplus1])
+        log_jacobian = logh_j_prime - 2.0 * logsumexp([logh_j, logh_jplus1])
 
         # log acceptance probability
-        log_accept_prob = log_like_ratio + log_prior_ratio + \
-                                log_proposal_ratio + log_jacobian
+        log_accept_prob = (
+            log_like_ratio + log_prior_ratio + log_proposal_ratio + log_jacobian
+        )
 
         # either accept or reject the proposed move
         if np.log(np.random.uniform()) < log_accept_prob:
@@ -530,8 +557,7 @@ class RJMCMC:
             accept = 0
             return state, accept
 
-    def run_mcmc(self,
-                 num_iter=100):
+    def run_mcmc(self, num_iter=100):
         r"""
         Run the RJMCMC algorithm for a specified number of iterations.
 
@@ -541,11 +567,11 @@ class RJMCMC:
             Number of MCMC iterations to perform.
         """
         # initialise the MCMC at these parameter values
-        x0 = np.array([1.4e+04, 8.6e-03, 2.6e-03])
+        x0 = np.array([1.4e04, 8.6e-03, 2.6e-03])
 
         self.chain = [x0]
-        move_type_attempt_count = {0:0, 1:0, 2:0, 3:0}
-        move_type_accept_count = {0:0, 1:0, 2:0, 3:0}
+        move_type_attempt_count = {0: 0, 1: 0, 2: 0, 3: 0}
+        move_type_accept_count = {0: 0, 1: 0, 2: 0, 3: 0}
 
         # evolve chain for specified number of iterations
         for i in tqdm(range(num_iter)):
@@ -556,19 +582,20 @@ class RJMCMC:
 
         # print a summary of the move types and acceptance fractions
         for i in range(4):
-            f = move_type_attempt_count[i]/num_iter
-            a = move_type_accept_count[i]/max(1, move_type_attempt_count[i])
-            m = ['Height change', 'Position change', 'Birth', 'Death'][i]
-            print(f"{m} moves attempted {100*f:.1f}% of the time",
-                f"with an acceptance fraction of {a:.3f}")
+            f = move_type_attempt_count[i] / num_iter
+            a = move_type_accept_count[i] / max(1, move_type_attempt_count[i])
+            m = ["Height change", "Position change", "Birth", "Death"][i]
+            print(
+                f"{m} moves attempted {100 * f:.1f}% of the time",
+                f"with an acceptance fraction of {a:.3f}",
+            )
 
 
 def main():
-    intervals = np.loadtxt('coal_mining_accident_data.dat').T.flatten()
+    intervals = np.loadtxt("coal_mining_accident_data.dat").T.flatten()
     sampler = RJMCMC(intervals)
     sampler.run_mcmc(num_iter=1000)
 
 
 if __name__ == "__main__":
-
     main()
