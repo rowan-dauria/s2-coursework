@@ -15,7 +15,7 @@
 \maketitle
 
 %----------------------------------------------------------------------
-\section*{Question 1 --- Accident data}
+\section*{Question 1 -- Accident data}
 %----------------------------------------------------------------------
 
 The mean rate of accidents over the full observation period is
@@ -31,7 +31,7 @@ The mean rate of accidents over the full observation period is
 \end{figure}
 
 %----------------------------------------------------------------------
-\section*{Question 2 --- Priors}
+\section*{Question 2 -- Priors}
 %----------------------------------------------------------------------
 
 \subsection*{(a) Comparing change-point priors}
@@ -81,7 +81,7 @@ Rescaling to the observation interval via $s_j = L\hat{s}_j$ gives $g_j = L\hat{
 \]
 
 %----------------------------------------------------------------------
-\section*{Question 3 --- The constant rate model, $M_0$}
+\section*{Question 3 -- The constant rate model, $M_0$}
 %----------------------------------------------------------------------
 
 \subsection*{(a) Prior and posterior for $h_0$; evidence $Z_0$}
@@ -90,7 +90,7 @@ Under $M_0$ the rate is constant at $h_0$ with prior $h_0 \sim \Gamma(1, 200)$, 
 The likelihood is $\mathcal{L} = h_0^N e^{-h_0 L}$, so the unnormalised posterior is $h_0^N e^{-h_0(L + \beta)}$, which is a Gamma distribution with shape $\alpha + N = 192$ and rate $\beta + L = 40750$.
 
 Figure~\ref{fig:q3a} compares the prior and posterior.
-The prior is an exponential distribution broadly spread over small rates, while the posterior is sharply concentrated around $h_0 \approx N/(L + \beta) \approx 4.71 \times 10^{-3}$ accidents per day --- essentially the observed mean rate.
+The prior is an exponential distribution broadly spread over small rates, while the posterior is sharply concentrated around $h_0 \approx N/(L + \beta) \approx 4.71 \times 10^{-3}$ accidents per day, essentially the observed mean rate.
 The data are highly informative: the posterior is orders of magnitude narrower than the prior.
 
 The evidence is computed analytically:
@@ -109,7 +109,7 @@ This was verified by numerical integration, yielding identical results.
 \end{figure}
 
 %----------------------------------------------------------------------
-\section*{Question 4 --- The 1 change-point model, $M_1$}
+\section*{Question 4 -- The 1 change-point model, $M_1$}
 %----------------------------------------------------------------------
 
 \subsection*{(a) MCMC posterior sampling}
@@ -125,6 +125,13 @@ Convergence was assessed via: (i) visual inspection of trace plots (Figure~\ref{
 
 The posterior medians and 68\% credible intervals are $h_0 = 0.0086 \pm 0.0008$, $h_1 = 0.0025 \pm 0.0003$, and $s_1 = 14\,362 \pm 770$ days (corresponding to $\sim$1890).
 The corner plot (Figure~\ref{fig:q4a_corner}) shows a clear separation between $h_0$ and $h_1$, confirming that the data strongly favour a decrease in accident rate.
+
+We note that the $\Gamma(1, 200)$ priors on $h_0$ and $h_1$ are conjugate to the Poisson process likelihood.
+For fixed $s_1$ the likelihood factorises, so each height can be analytically marginalised:
+$\int_0^\infty h_0^{n_0} e^{-h_0(s_1+\beta)}\,\beta^\alpha\,\mathrm{d}h_0 = \beta^\alpha\,\Gamma(\alpha+n_0)\,/\,(\beta+s_1)^{\alpha+n_0}$,
+and similarly for $h_1$.
+This yields a one-dimensional marginal posterior on $s_1$ alone, from which $h_0$ and $h_1$ samples can be drawn conditionally as $h_0 \mid s_1 \sim \Gamma(\alpha + n_0,\;\beta + s_1)$.
+Such a collapsed (Rao--Blackwellised) approach would reduce the sampling problem from three dimensions to one, but we retain the full \texttt{emcee} sampler here for generality.
 
 \begin{figure}[ht]
   \centering
@@ -142,24 +149,27 @@ The corner plot (Figure~\ref{fig:q4a_corner}) shows a clear separation between $
 
 \subsection*{(b) Savage--Dickey density ratio}
 
-The Savage--Dickey density ratio provides the Bayes factor between nested models without computing evidences explicitly.
+The Savage--Dickey density ratio provides the Bayes factor between nested models without computing evidences directly.
 Model $M_0$ is recovered from $M_1$ by setting $h_0 = h_1$ (equivalently $\delta = h_0 - h_1 = 0$).
 The Bayes factor is then
 \[
   B_{01} = \frac{Z_0}{Z_1} = \frac{p(\delta = 0 \mid \{I_i\}, M_1)}{\pi(\delta = 0 \mid M_1)},
 \]
-i.e.\ the ratio of the posterior to prior density of $\delta$ evaluated at $\delta = 0$.
+i.e.\ the ratio of the marginal posterior to prior density of $\delta$ evaluated at $\delta = 0$, both computed under $M_1$.
+This avoids any explicit evidence calculation.
 
-The difficulty is twofold.
-First, the unconstrained $M_1$ posterior concentrates around $\delta \approx 0.006$, far from zero --- the data strongly favour distinct rates.
-No MCMC samples visit $\delta \approx 0$, so any kernel density estimate of the posterior at that point is unreliable.
-Second, when we enforce $h_0 = h_1$ the change point $s_1$ becomes completely unidentifiable: with equal rates on both sides, $s_1$ has no effect on the likelihood and simply follows its prior (Figure~\ref{fig:q4b}).
-This degeneracy at the nested point means the Savage--Dickey ratio cannot be practically evaluated.
+The Savage--Dickey ratio requires evaluating the numerator $p(\delta = 0 \mid \{I_i\}, M_1)$.
+In practice this density must be estimated from MCMC samples drawn from the $M_1$ posterior (e.g.\ via a histogram or kernel density estimate at $\delta = 0$).
+However, the $M_1$ posterior strongly favours distinct rates before and after the change point: the marginal posterior of $\delta$ concentrates around $\delta \approx 0.006$, far from zero (Figure~\ref{fig:q4b}).
+Virtually no MCMC samples fall near $\delta = 0$, so any density estimate there is dominated by noise.
+
+If evaluated, the ratio would give $B_{01} \approx 0$ (i.e.\ $B_{10} \to \infty$), qualitatively confirming $M_1$ is favoured.
+However, the KDE value at $\delta = 0$ depends entirely on bandwidth and random fluctuations and could vary by many orders of magnitude, making the Bayes factor estimate quantitatively useless.
 
 \begin{figure}[ht]
   \centering
-  \includegraphics[width=\textwidth]{figs/q4b_savage_dickey.pdf}
-  \caption{Illustration of the Savage--Dickey difficulty. When $h_0 = h_1$, the posterior on $s_1$ reverts to the prior, and $\delta = 0$ lies deep in the tail of the unconstrained posterior.}
+  \includegraphics[width=0.8\textwidth]{figs/q4b_savage_dickey.pdf}
+  \caption{Marginal posterior of $\delta = h_0 - h_1$ under $M_1$. The nested point $\delta = 0$ lies deep in the tail where no MCMC samples reach, making the Savage--Dickey numerator impossible to estimate reliably.}
   \label{fig:q4b}
 \end{figure}
 
@@ -173,14 +183,14 @@ where $d = 3$, $\hat{\theta}$ is the MAP estimate, and $\hat{\Sigma}$ is the inv
 
 The difficulty is that the $M_1$ log-likelihood contains a hard step function at $s_1$: an event at time $y_i$ contributes $\log h_0$ if $y_i < s_1$ and $\log h_1$ otherwise.
 The log-likelihood is therefore piecewise linear in $s_1$ between adjacent event times, with discontinuous jumps whenever $s_1$ crosses an event time.
-The Hessian $\partial^2 \log P / \partial s_1^2$ is zero almost everywhere with delta-function singularities at each event time --- it is not well defined.
+The Hessian $\partial^2 \log P / \partial s_1^2$ is zero almost everywhere with delta-function singularities at each event time; it is not well defined.
 The Gaussian approximation is therefore invalid: the posterior is not smooth in $s_1$, and the Laplace approximation breaks down.
 
 \subsection*{(d) Nested sampling for $M_1$ evidence}
 
 We used \texttt{dynesty}'s static nested sampler with 1000 live points and a stopping criterion of $\Delta \log Z < 0.01$.
 The prior transform maps from the unit cube to the physical parameter space via the inverse CDFs of the $\Gamma(1, 200)$ priors for $h_0, h_1$ and the $\text{Beta}(2, 2)$ prior (scaled to $[0, L]$) for $s_1$.
-The log-likelihood is the same piecewise-constant Poisson process expression used in the MCMC --- \texttt{dynesty} requires no gradients, so the discontinuity in $s_1$ poses no difficulty.
+The log-likelihood is the same piecewise-constant Poisson process expression used in the MCMC; \texttt{dynesty} requires no gradients, so the discontinuity in $s_1$ poses no difficulty.
 Multi-ellipsoidal decomposition was used for bounding the live-point distribution.
 
 The results are:
@@ -196,7 +206,7 @@ The prior odds are $\pi(M_1)/\pi(M_0) = \lambda = 3$ (from the truncated Poisson
 The data overwhelmingly favour $M_1$ over $M_0$.
 
 %----------------------------------------------------------------------
-\section*{Question 5 --- The $k$ change-point models, $M_k$}
+\section*{Question 5 -- The $k$ change-point models, $M_k$}
 %----------------------------------------------------------------------
 
 \subsection*{(b) RJMCMC trace and posterior on $k$}
@@ -222,7 +232,7 @@ Figure~\ref{fig:q5c} shows the model-averaged inferred accident rate $x(t)$ with
 \textbf{Calculating the uncertainty regions.}
 For each post-burn-in RJMCMC sample, the state encodes a complete step-function rate $x(t)$ with a particular number of change points $k$, change-point positions, and segment rates.
 Each sample's rate function was evaluated on a dense grid of 1000 time points spanning the observation period.
-This produces, at each grid point, an ensemble of rate values drawn from the full model-averaged posterior --- samples with different $k$ contribute naturally since the RJMCMC chain explores the joint space of all models.
+This produces, at each grid point, an ensemble of rate values drawn from the full model-averaged posterior; samples with different $k$ contribute naturally since the RJMCMC chain explores the joint space of all models.
 The 50\% credible region is the interval between the 25th and 75th percentiles of this ensemble at each time point, and the 90\% region spans the 5th to 95th percentiles.
 The median is the pointwise 50th percentile.
 These are pointwise credible intervals, not simultaneous bands.
