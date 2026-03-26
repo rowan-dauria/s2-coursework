@@ -162,6 +162,46 @@ def plot_changepoint_prior_comparison(
     return fig
 
 
+def set_corner_titles(
+    fig: Figure,
+    flat_samples: np.ndarray,
+    param_labels: list[str],
+    param_fmts: list[str],
+) -> None:
+    """Set diagonal titles on a corner plot with per-parameter formatting.
+
+    Each diagonal panel gets a title of the form
+    ``label = median ^{+upper}_{-lower}`` using the 16th/50th/84th percentiles.
+
+    Parameters
+    ----------
+    fig : Figure
+        The corner-plot figure (as returned by ``corner.corner``).
+    flat_samples : (n_samples, ndim) array
+        Flattened MCMC chain.
+    param_labels : list of str
+        LaTeX-style labels for each parameter.
+    param_fmts : list of str
+        Format specifiers (e.g. ``".4f"``, ``".0f"``) for each parameter.
+    """
+    ndim = flat_samples.shape[1]
+    axes = np.array(fig.axes).reshape((ndim, ndim))
+    for i in range(ndim):
+        q_lo, q_mid, q_hi = np.percentile(flat_samples[:, i], [16, 50, 84])
+        q_plus = q_hi - q_mid
+        q_minus = q_mid - q_lo
+        fmt = param_fmts[i]
+        title = (
+            f"{param_labels[i]} = {q_mid:{fmt}}"
+            + r"$^{+"
+            + f"{q_plus:{fmt}}"
+            + r"}_{-"
+            + f"{q_minus:{fmt}}"
+            + r"}$"
+        )
+        axes[i, i].set_title(title)
+
+
 @autosave
 def plot_rate_history(
     intervals: np.ndarray,
